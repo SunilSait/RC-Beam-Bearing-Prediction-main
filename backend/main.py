@@ -6,12 +6,19 @@ import math
 import numpy as np
 import tensorflow as tf
 import joblib
+import os
 
 # ====================================================
 # LOAD WEIGHTED NEURAL NETWORK (INFERENCE ONLY)
 # ====================================================
-model = tf.keras.models.load_model("beam_weighted_model.keras")
-scaler = joblib.load("scaler.save")
+# Get the directory where this script is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "beam_weighted_model.keras")
+SCALER_PATH = os.path.join(BASE_DIR, "scaler.save")
+
+# Load model and scaler
+model = tf.keras.models.load_model(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
 
 # ====================================================
 # FASTAPI APP SETUP
