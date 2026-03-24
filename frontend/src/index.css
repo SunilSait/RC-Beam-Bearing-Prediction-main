@@ -12,6 +12,8 @@
   --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --safe-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  --unsafe-gradient: linear-gradient(135deg, #f5576c 0%, #ff6b6b 100%);
   --dark-bg: #0f0f23;
   --card-bg: rgba(255, 255, 255, 0.05);
   --card-border: rgba(255, 255, 255, 0.1);
@@ -172,6 +174,10 @@ body {
   gap: var(--spacing-md);
 }
 
+.input-grid.grid-3-col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .input-group {
   display: flex;
   flex-direction: column;
@@ -207,27 +213,197 @@ body {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
-/* Select Dropdown Specific Styles */
-select.input-field {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M10.293 3.293L6 7.586 1.707 3.293A1 1 0 00.293 4.707l5 5a1 1 0 001.414 0l5-5a1 1 0 10-1.414-1.414z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 1rem center;
-  background-size: 12px;
-  padding-right: 2.5rem;
+/* Constrained dropdown width */
+.dropdown-constrained {
+  max-width: 400px;
 }
 
-select.input-field::-ms-expand {
-  display: none;
+/* ====================================================
+   CUSTOM DROPDOWN
+   ==================================================== */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
 }
 
-select.input-field option {
-  background: #1a1a2e;
+.dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  padding: 0.5rem;
+  font-size: 1rem;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.dropdown-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-dropdown.open .dropdown-trigger {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-trigger-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dropdown-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.dropdown-selected-text {
+  font-weight: 500;
+}
+
+.dropdown-chevron {
+  color: var(--text-secondary);
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.dropdown-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: rgba(22, 22, 45, 0.95);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  z-index: 100;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(102, 126, 234, 0.1);
+  animation: dropdownSlideIn 0.2s ease-out;
+}
+
+@keyframes dropdownSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.dropdown-option:hover {
+  background: rgba(102, 126, 234, 0.12);
+  border-color: rgba(102, 126, 234, 0.2);
+}
+
+.dropdown-option.active {
+  background: rgba(102, 126, 234, 0.18);
+  border-color: rgba(102, 126, 234, 0.35);
+}
+
+.dropdown-option + .dropdown-option {
+  margin-top: 2px;
+}
+
+.dropdown-option-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+.dropdown-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dropdown-option-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.dropdown-option-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.dropdown-check {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Checkbox Styles */
+.checkbox-row {
+  margin-top: var(--spacing-md);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  transition: all 0.3s ease;
+}
+
+.checkbox-label:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.checkbox-input {
+  width: 20px;
+  height: 20px;
+  accent-color: #667eea;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.checkbox-text {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 /* ====================================================
@@ -235,7 +411,7 @@ select.input-field option {
    ==================================================== */
 .button-group {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--spacing-md);
   margin-top: var(--spacing-lg);
 }
@@ -244,7 +420,7 @@ select.input-field option {
   padding: 1rem 2rem;
   border: none;
   border-radius: var(--radius-md);
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
   font-family: var(--font-family);
   cursor: pointer;
@@ -283,16 +459,6 @@ select.input-field option {
 
 .btn-primary:hover {
   box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
-  transform: translateY(-2px);
-}
-
-.btn-secondary {
-  background: var(--secondary-gradient);
-  color: white;
-}
-
-.btn-secondary:hover {
-  box-shadow: 0 12px 40px rgba(245, 87, 108, 0.4);
   transform: translateY(-2px);
 }
 
@@ -349,33 +515,50 @@ select.input-field option {
   gap: var(--spacing-lg);
 }
 
-/* Capacity Display */
-.capacity-display {
+/* Safety Check */
+.safety-check {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  border: 2px solid;
+  animation: slideIn 0.4s ease-out;
+}
+
+.safety-check.safe {
+  background: rgba(67, 233, 123, 0.1);
+  border-color: rgba(67, 233, 123, 0.4);
+}
+
+.safety-check.unsafe {
+  background: rgba(245, 87, 108, 0.1);
+  border-color: rgba(245, 87, 108, 0.4);
+}
+
+.safety-icon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+}
+
+.safety-content {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-md);
-  background: var(--success-gradient);
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 242, 254, 0.3);
-  max-width: 400px;
-  margin: 0 auto;
+  gap: 0.25rem;
 }
 
-.capacity-label {
+.safety-title {
   font-size: 0.85rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
+  color: var(--text-secondary);
 }
 
-.capacity-value {
-  font-size: 2rem;
-  font-weight: 700;
-  color: white;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+.safety-status {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 /* Capacity Cards */
@@ -402,103 +585,34 @@ select.input-field option {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
+.capacity-card.highlight {
+  background: rgba(102, 126, 234, 0.15);
+  border-color: rgba(102, 126, 234, 0.4);
+}
+
+.capacity-card.highlight .card-value {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .card-label {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
 .card-value {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-/* Neural Network Prediction Card */
-.nn-prediction-card {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  background: var(--input-bg);
-  border: 2px solid var(--input-border);
-  border-radius: var(--radius-md);
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.nn-prediction-card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--success-gradient);
-}
-
-.nn-prediction-card:hover {
-  border-color: rgba(79, 172, 254, 0.5);
-  box-shadow: 0 8px 24px rgba(79, 172, 254, 0.2);
-  transform: translateY(-2px);
-}
-
-.nn-icon-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 60px;
-  height: 60px;
-  background: var(--success-gradient);
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
-}
-
-.nn-icon {
-  font-size: 2rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-}
-
-.nn-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  flex: 1;
-}
-
-.nn-label {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+.card-unit {
+  font-size: 0.9rem;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.nn-value {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.nn-unit {
-  font-size: 1.1rem;
-  font-weight: 600;
   color: var(--text-secondary);
-  margin-left: 0.25rem;
-}
-
-.mode-badge {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  background: var(--primary-gradient);
-  border-radius: var(--radius-sm);
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  text-align: center;
 }
 
 /* Detailed Results */
@@ -550,32 +664,99 @@ select.input-field option {
   color: var(--text-primary);
 }
 
-/* Warnings */
-.warnings-section {
+/* Status Cards (Reinforcement Type & Failure Mode) */
+.status-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
   padding: var(--spacing-lg);
-  background: rgba(245, 87, 108, 0.1);
-  border: 1px solid rgba(245, 87, 108, 0.3);
+  background: var(--input-bg);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--input-border);
+  border-left: 4px solid;
+  transition: all 0.3s ease;
 }
 
-.warnings-section h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: var(--spacing-md);
-  color: #f5576c;
+.status-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.warning-item {
-  padding: var(--spacing-sm);
-  background: rgba(245, 87, 108, 0.15);
-  border-left: 3px solid #f5576c;
+.status-card.status-ductile {
+  border-left-color: #43e97b;
+  background: rgba(67, 233, 123, 0.06);
+}
+
+.status-card.status-brittle {
+  border-left-color: #f5576c;
+  background: rgba(245, 87, 108, 0.06);
+}
+
+.status-card-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-sm);
-  margin-bottom: var(--spacing-sm);
+}
+
+.status-ductile .status-card-icon {
+  background: rgba(67, 233, 123, 0.15);
+}
+
+.status-brittle .status-card-icon {
+  background: rgba(245, 87, 108, 0.15);
+}
+
+.status-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.status-card-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.status-card-value {
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
-.warning-item:last-child {
-  margin-bottom: 0;
+/* Beam Cross Section */
+.beam-section {
+  padding: var(--spacing-lg);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+}
+
+.beam-section h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+}
+
+.beam-svg-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-md);
 }
 
 /* Error Container */
@@ -640,16 +821,34 @@ select.input-field option {
   }
 }
 
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* ====================================================
    RESPONSIVE DESIGN
    ==================================================== */
+@media (max-width: 1024px) {
+  .input-grid.grid-3-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .container {
     padding: var(--spacing-md);
   }
 
   .title {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
 
   .subtitle {
@@ -665,6 +864,10 @@ select.input-field option {
     grid-template-columns: 1fr;
   }
 
+  .input-grid.grid-3-col {
+    grid-template-columns: 1fr;
+  }
+
   .button-group {
     grid-template-columns: 1fr;
   }
@@ -677,57 +880,53 @@ select.input-field option {
     grid-template-columns: 1fr;
   }
 
-  .capacity-value {
-    font-size: 2.5rem;
+  .status-cards {
+    grid-template-columns: 1fr;
   }
 
   .input-form,
   .result-container {
     padding: var(--spacing-lg);
   }
+
+  .safety-check {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    left: 0;
+    right: 0;
+  }
+
+  .result-header h2 {
+    font-size: 1.4rem;
+  }
+
+  .card-value {
+    font-size: 1.3rem;
+  }
 }
 
 @media (max-width: 480px) {
   .title {
-    font-size: 1.5rem;
-  }
-
-  .capacity-value {
-    font-size: 2rem;
+    font-size: 1.3rem;
   }
 
   .card-value {
-    font-size: 1.5rem;
+    font-size: 1.1rem;
   }
-}
 
-/* ====================================================
-   UTILITY CLASSES
-   ==================================================== */
-.text-center {
-  text-align: center;
-}
+  .safety-status {
+    font-size: 0.95rem;
+  }
 
-.mt-1 {
-  margin-top: var(--spacing-sm);
-}
+  .dropdown-option {
+    padding: 0.75rem;
+  }
 
-.mt-2 {
-  margin-top: var(--spacing-md);
-}
-
-.mt-3 {
-  margin-top: var(--spacing-lg);
-}
-
-.mb-1 {
-  margin-bottom: var(--spacing-sm);
-}
-
-.mb-2 {
-  margin-bottom: var(--spacing-md);
-}
-
-.mb-3 {
-  margin-bottom: var(--spacing-lg);
+  .dropdown-option-desc {
+    display: none;
+  }
 }

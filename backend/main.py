@@ -1,182 +1,182 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
-from typing import List, Literal
+from pydantic import BaseModel, Field
+from typing import Optional
 import math
-import numpy as np
-import tensorflow as tf
-import joblib
-import os
-
-# ====================================================
-# LOAD WEIGHTED NEURAL NETWORK (INFERENCE ONLY)
-# ====================================================
-# Get the directory where this script is located
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "beam_weighted_model.keras")
-SCALER_PATH = os.path.join(BASE_DIR, "scaler.save")
-
-# Load model and scaler
-model = tf.keras.models.load_model(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
 
 # ====================================================
 # FASTAPI APP SETUP
 # ====================================================
 app = FastAPI(
-    title="RC Beam Bearing Capacity API",
-    description="API for calculating RC beam bearing capacity using IS-456 code and Neural Network predictions",
-    version="1.0.0"
+    title="IS 456 Beam Capacity Predictor API",
+    description="API for predicting RC beam capacity using IS-456 code provisions",
+    version="2.0.0"
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ====================================================
-# PYDANTIC MODELS FOR REQUEST VALIDATION
+# PYDANTIC MODELS
 # ====================================================
 class BeamParameters(BaseModel):
-    fck: Literal[20, 25, 30, 35, 40] = Field(..., description="Concrete grade (MPa)")
-    fy: Literal[415, 500] = Field(..., description="Steel grade (MPa)")
-    b: float = Field(..., ge=150, le=1000, description="Beam width (mm)")
-    D: float = Field(..., ge=200, le=1000, description="Overall depth (mm)")
-    L: float = Field(..., ge=500, le=10000, description="Beam length (mm)")
-    load_type: Literal["Point Load", "Two Point Load"] = Field(..., description="Type of loading")
-    main_dia: float = Field(..., ge=8, le=32, description="Main bar diameter (mm)")
-    main_count: int = Field(..., ge=1, le=8, description="Number of main bars")
-    stirrup_dia: float = Field(..., ge=6, le=12, description="Stirrup diameter (mm)")
-    spacing: float = Field(..., ge=80, le=300, description="Stirrup spacing (mm)")
+    fck: float = Field(..., ge=15, le=80, description="Concrete Strength fck (MPa)")
+    fy: float = Field(..., ge=250, le=600, description="Steel Yield Strength fy (MPa)")
+    b: float = Field(..., ge=100, le=2000, description="Beam Width b (mm)")
+    D: float = Field(..., ge=150, le=2000, description="Overall Depth D (mm)")
+    L: float = Field(..., ge=500, le=20000, description="Span Length L (mm)")
+    loading_type: str = Field(default="Single Point Load", description="Loading Type")
+    num_bars: int = Field(..., ge=1, le=20, description="Number of Main Bars")
+    main_dia: float = Field(..., ge=8, le=40, description="Main Bar Diameter (mm)")
+    stirrup_dia: float = Field(..., ge=6, le=16, description="Stirrup Diameter (mm)")
+    stirrup_spacing: float = Field(..., ge=50, le=500, description="Stirrup Spacing (mm)")
+    cover: float = Field(default=30.0, ge=15, le=100, description="Concrete Cover (mm)")
+    custom_d: Optional[float] = Field(default=None, ge=50, le=2000, description="Custom Effective Depth (mm)")
+    applied_load: float = Field(default=0.0, ge=0, description="Applied Load (kN)")
 
 class CalculationResult(BaseModel):
-    Wu_kN_gross: float
-    Wu_kN_net: float
-    Mu_kNm: float
-    Vu_kN: float
-    d_mm: float
-    pt_percent: float
-    tau_v: float
-    tau_c: float
-    tau_c_max: float
-    mode: str
-    warnings: List[str]
-
-class NNPredictionResult(BaseModel):
-    predicted_capacity_kN: float
+    ultimate_moment_capacity_kNm: float
+    design_shear_capacity_kN: float
+    maximum_shear_capacity_kN: float
+    shear_capacity_kN: float
+    maximum_load_capacity_kN: float
+    effective_depth_mm: float
+    steel_area_mm2: float
+    steel_ratio_rho: float
+    reinforcement_type: str
+    failure_mode: str
+    is_safe: Optional[bool] = None
+    applied_load_kN: float
 
 # ====================================================
-# IS 456 τc TABLE (p_t vs fck)
+# IS 456 τc TABLE (Table 19)
 # ====================================================
-tc_table = {
-    20: [0.28, 0.32, 0.36, 0.40, 0.45],
-    25: [0.29, 0.33, 0.37, 0.41, 0.46],
-    30: [0.30, 0.34, 0.38, 0.42, 0.47],
-    35: [0.31, 0.35, 0.39, 0.43, 0.48],
-    40: [0.32, 0.36, 0.40, 0.44, 0.49]
-}
+def get_tau_c(fck: float, rho: float) -> float:
+    p = rho * 100
 
-pt_range = [0.15, 0.25, 0.50, 0.75, 1.0]
-tc_max = {20: 2.8, 25: 3.1, 30: 3.5, 35: 3.7, 40: 4.0}
+    p_values = [0.15, 0.25, 0.50, 0.75, 1.00]
 
-def get_tc(pt: float, fck: int) -> float:
-    pt = max(min(pt, 1.0), 0.15)
-    return float(np.interp(pt, pt_range, tc_table[fck]))
-
-# ====================================================
-# SELF WEIGHT
-# ====================================================
-def self_weight_kN_per_m(b: float, D: float) -> float:
-    density = 25  # kN/m3
-    return density * (b / 1000) * (D / 1000)
-
-# ====================================================
-# MAIN IS-456 CALCULATION FUNCTION
-# ====================================================
-def calculate_is456(params: BeamParameters) -> dict:
-    cover = 25
-    d = params.D - cover - params.stirrup_dia - params.main_dia / 2
-
-    if d <= 0:
-        raise HTTPException(status_code=400, detail="Invalid effective depth")
-
-    Ast = (math.pi / 4) * (params.main_dia ** 2) * params.main_count
-    Asv = (math.pi / 4) * (params.stirrup_dia ** 2) * 2
-
-    xu = (0.87 * params.fy * Ast) / (0.36 * params.fck * params.b)
-    xu_max = 0.48 * d
-    xu = min(xu, xu_max)
-
-    Mu = 0.36 * params.fck * params.b * xu * (d - 0.42 * xu)
-    Mu_lim = 0.138 * params.fck * params.b * d * d
-    Mu = min(Mu, Mu_lim)
-
-    eff_span = min(params.L + d, params.L)
-
-    if params.load_type == "Point Load":
-        W_flex = 4 * Mu / eff_span
-    else:
-        W_flex = 6 * Mu / eff_span
-
-    pt = 100 * Ast / (params.b * d)
-    tc = get_tc(pt, params.fck)
-    tc_lim = tc_max[params.fck]
-
-    V = W_flex / 2
-    tau_v = V / (params.b * d)
-
-    Vc = tc * params.b * d
-    Vs = 0.87 * params.fy * Asv * d / params.spacing
-    Vu = Vc + Vs
-
-    W_shear = 2 * Vu
-    Wu = min(W_flex, W_shear)
-
-    sw = self_weight_kN_per_m(params.b, params.D) * (params.L / 1000)
-    Wu_net = Wu / 1000 - sw
-
-    if W_flex < 0.9 * W_shear:
-        mode = "Flexural"
-    elif W_shear < 0.9 * W_flex:
-        mode = "Shear"
-    else:
-        mode = "Combined"
-
-    warnings = []
-    if tau_v > tc_lim:
-        warnings.append("τv exceeds τc,max → unsafe section.")
-    if Wu_net <= 0:
-        warnings.append("Beam fails under self weight!")
-
-    return {
-        "Wu_kN_gross": Wu / 1000,
-        "Wu_kN_net": Wu_net,
-        "Mu_kNm": Mu / 1e6,
-        "Vu_kN": Vu / 1000,
-        "d_mm": d,
-        "pt_percent": pt,
-        "tau_v": tau_v,
-        "tau_c": tc,
-        "tau_c_max": tc_lim,
-        "mode": mode,
-        "warnings": warnings
+    tau_table = {
+        20: [0.28, 0.36, 0.48, 0.56, 0.62],
+        25: [0.29, 0.37, 0.49, 0.57, 0.64],
+        30: [0.30, 0.38, 0.50, 0.59, 0.66],
+        35: [0.31, 0.39, 0.51, 0.60, 0.67],
+        40: [0.32, 0.40, 0.52, 0.62, 0.70]
     }
 
+    # Snap to nearest grade in table
+    nearest_fck = min(tau_table.keys(), key=lambda x: abs(x - fck))
+    tau_values = tau_table[nearest_fck]
+
+    if p <= p_values[0]:
+        return tau_values[0]
+
+    if p >= p_values[-1]:
+        return tau_values[-1]
+
+    for i in range(len(p_values) - 1):
+        if p_values[i] <= p <= p_values[i + 1]:
+            p1, p2 = p_values[i], p_values[i + 1]
+            t1, t2 = tau_values[i], tau_values[i + 1]
+            return t1 + (p - p1) * (t2 - t1) / (p2 - p1)
+
+    return tau_values[0]
+
 # ====================================================
-# NEURAL NETWORK PREDICTION
+# IS 456 BEAM CAPACITY CALCULATION
 # ====================================================
-def nn_predict(params: BeamParameters) -> float:
-    features = [
-        params.fck, params.fy, params.b, params.D, params.L,
-        params.main_dia, params.main_count,
-        params.stirrup_dia, params.spacing
-    ]
-    features_scaled = scaler.transform([features])
-    return float(model.predict(features_scaled)[0][0])
+def calculate_beam_capacity(params: BeamParameters) -> dict:
+    # Effective depth
+    if params.custom_d is not None:
+        d = params.custom_d
+    else:
+        d = params.D - params.cover - (params.main_dia / 2)
+
+    if d <= 0:
+        raise HTTPException(status_code=400, detail="Invalid effective depth. Check cover and bar diameter.")
+
+    # Steel area
+    As = params.num_bars * (math.pi / 4) * (params.main_dia ** 2)
+
+    # Steel ratio
+    rho = As / (params.b * d)
+
+    # Neutral axis depth
+    xu = (0.87 * params.fy * As) / (0.36 * params.fck * params.b)
+    xu_max = 0.48 * d
+
+    if xu > xu_max:
+        xu = xu_max
+        reinf_type = "Over-Reinforced (Brittle)"
+    else:
+        reinf_type = "Under-Reinforced (Ductile)"
+
+    # Moment capacity
+    Mu_Nmm = 0.87 * params.fy * As * (d - 0.42 * xu)
+    Mu_kNm = Mu_Nmm / 1e6
+
+    # Shear capacity
+    tau_c = get_tau_c(params.fck, rho)
+    Vc_N = tau_c * params.b * d
+
+    Asv = 2 * (math.pi / 4) * (params.stirrup_dia ** 2)
+    Vs_N = (0.87 * params.fy * Asv * d) / params.stirrup_spacing
+
+    Vu_design = (Vc_N + Vs_N) / 1000
+
+    # Maximum shear capacity (IS 456 Table 20)
+    tau_c_max_table = {
+        20: 2.8,
+        25: 3.1,
+        30: 3.5,
+        35: 3.7,
+        40: 4.0
+    }
+    nearest_fck_max = min(tau_c_max_table.keys(), key=lambda x: abs(x - params.fck))
+    tau_c_max = tau_c_max_table[nearest_fck_max]
+    Vmax = (tau_c_max * params.b * d) / 1000
+
+    Vu_kN = min(Vu_design, Vmax)
+
+    # Load calculation depending on loading type
+    if params.loading_type == "Single Point Load":
+        W_kN = (4 * Mu_kNm) / (params.L / 1000)
+    elif params.loading_type == "Two Point Load":
+        W_kN = (6 * Mu_kNm) / (params.L / 1000)
+    else:
+        W_kN = (4 * Mu_kNm) / (params.L / 1000)
+
+    # Failure mode
+    if Vu_design < W_kN / 2:
+        failure = "Shear Failure (Brittle)"
+    else:
+        failure = "Flexural Failure (Ductile)"
+
+    # Safety check
+    is_safe = None
+    if params.applied_load > 0:
+        is_safe = params.applied_load < W_kN
+
+    return {
+        "ultimate_moment_capacity_kNm": round(Mu_kNm, 2),
+        "design_shear_capacity_kN": round(Vu_design, 2),
+        "maximum_shear_capacity_kN": round(Vmax, 2),
+        "shear_capacity_kN": round(Vu_kN, 2),
+        "maximum_load_capacity_kN": round(W_kN, 2),
+        "effective_depth_mm": round(d, 2),
+        "steel_area_mm2": round(As, 2),
+        "steel_ratio_rho": round(rho, 4),
+        "reinforcement_type": reinf_type,
+        "failure_mode": failure,
+        "is_safe": is_safe,
+        "applied_load_kN": params.applied_load
+    }
 
 # ====================================================
 # API ENDPOINTS
@@ -184,52 +184,38 @@ def nn_predict(params: BeamParameters) -> float:
 @app.get("/")
 def root():
     return {
-        "message": "RC Beam Bearing Capacity API",
-        "version": "1.0.0",
+        "message": "IS 456 Beam Capacity Predictor API",
+        "version": "2.0.0",
         "docs": "/docs",
         "endpoints": {
-            "calculate_is456": "/api/calculate-is456",
-            "predict_nn": "/api/predict-nn"
+            "predict": "/api/predict"
         }
     }
 
-@app.post("/api/calculate-is456", response_model=CalculationResult)
-def calculate_endpoint(params: BeamParameters):
+@app.post("/api/predict", response_model=CalculationResult)
+def predict_endpoint(params: BeamParameters):
     """
-    Calculate RC beam bearing capacity using IS-456 code standards.
-    
-    Returns detailed calculation results including:
-    - Gross and net capacity
-    - Flexural moment
-    - Shear capacity
-    - Failure mode
-    - Safety warnings
+    Predict RC beam bearing capacity using IS-456 code provisions.
+
+    Returns detailed results including:
+    - Ultimate moment capacity
+    - Shear capacities (design, maximum, final)
+    - Maximum load capacity
+    - Reinforcement type and failure mode
+    - Safety check (if applied load is provided)
     """
     try:
-        result = calculate_is456(params)
+        result = calculate_beam_capacity(params)
         return result
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
 
-@app.post("/api/predict-nn", response_model=NNPredictionResult)
-def predict_endpoint(params: BeamParameters):
-    """
-    Predict RC beam bearing capacity using trained Neural Network model.
-    
-    Returns the predicted net capacity in kN.
-    """
-    try:
-        prediction = nn_predict(params)
-        return {"predicted_capacity_kN": prediction}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
-
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "model_loaded": model is not None}
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn
