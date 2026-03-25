@@ -630,21 +630,89 @@
     .cd-title {
         font-size: 1.6rem;
     }
+
+    .cd-connection-form {
+        flex-direction: column;
+    }
+
+    .cd-input-group {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .cd-btn-group {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .cd-btn-group .cd-btn {
+        flex: 1;
+    }
 }
 
 @media (max-width: 600px) {
+    .cd-header {
+        padding: 1rem 0 0.5rem;
+    }
+
+    .cd-logo-section {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .cd-logo-icon {
+        font-size: 2.2rem;
+    }
+
+    .cd-title {
+        font-size: 1.3rem;
+    }
+
+    .cd-subtitle {
+        font-size: 0.85rem;
+    }
+
+    .cd-grid {
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .cd-card {
+        padding: 1rem;
+        border-radius: 12px;
+    }
+
+    .cd-card-title {
+        font-size: 0.95rem;
+    }
+
     .cd-controls-row {
         flex-direction: column;
+    }
+
+    .cd-btn-capture,
+    .cd-btn-upload {
+        width: 100%;
+        flex: unset;
     }
 
     .cd-crack-type-badge {
         flex-direction: column;
         gap: 0.75rem;
         text-align: center;
+        padding: 1rem;
     }
 
     .cd-badge-confidence {
         align-items: center;
+    }
+
+    .cd-badge-type {
+        font-size: 1.05rem;
+    }
+
+    .cd-confidence-value {
+        font-size: 1.2rem;
     }
 
     .cd-images-compare {
@@ -655,12 +723,180 @@
         grid-template-columns: 1fr;
     }
 
-    .cd-logo-section {
-        flex-direction: column;
-        gap: 0.5rem;
+    .cd-feature-item {
+        padding: 0.65rem;
+    }
+
+    .cd-feature-value {
+        font-size: 1rem;
+    }
+
+    .cd-stream-placeholder p {
+        font-size: 0.8rem;
+    }
+
+    .cd-stream-placeholder svg {
+        width: 40px;
+        height: 40px;
+    }
+
+    .cd-history-thumb {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 400px) {
+    .cd-title {
+        font-size: 1.1rem;
+    }
+
+    .cd-card {
+        padding: 0.75rem;
+    }
+
+    .cd-btn {
+        font-size: 0.78rem;
+        padding: 0.55rem 0.75rem;
+    }
+
+    .cd-btn-capture {
+        font-size: 0.85rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .cd-badge-type {
+        font-size: 0.95rem;
+    }
+
+    .cd-input-group input {
+        font-size: 0.88rem;
+        padding: 0.55rem 0.75rem;
+    }
+
+    .cd-input-group label {
+        font-size: 0.72rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .cd-header {
+        padding: 0.5rem 0 0.25rem;
+    }
+
+    .cd-logo-icon {
+        font-size: 1.8rem;
     }
 
     .cd-title {
-        font-size: 1.3rem;
+        font-size: 0.95rem;
+    }
+
+    .cd-subtitle {
+        font-size: 0.75rem;
+    }
+
+    .cd-grid {
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .cd-card {
+        padding: 0.625rem;
+        border-radius: 10px;
+    }
+
+    .cd-card-title {
+        font-size: 0.85rem;
+        gap: 0.35rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .cd-card-icon {
+        font-size: 1rem;
+    }
+
+    .cd-btn {
+        font-size: 0.72rem;
+        padding: 0.5rem 0.5rem;
+        border-radius: 8px;
+    }
+
+    .cd-btn-capture {
+        font-size: 0.8rem;
+        padding: 0.65rem 0.75rem;
+    }
+
+    .cd-input-group input {
+        font-size: 0.82rem;
+        padding: 0.5rem 0.6rem;
+        border-radius: 8px;
+    }
+
+    .cd-input-group label {
+        font-size: 0.68rem;
+        letter-spacing: 0.5px;
+    }
+
+    .cd-badge-type {
+        font-size: 0.88rem;
+    }
+
+    .cd-confidence-value {
+        font-size: 1rem;
+    }
+
+    .cd-crack-type-badge {
+        padding: 0.75rem;
+        border-radius: 10px;
+        margin-bottom: 0.75rem;
+    }
+
+    /* History fixes for very small screens */
+    .cd-history-item {
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .cd-history-thumb {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+    }
+
+    .cd-history-name {
+        font-size: 0.72rem;
+    }
+
+    .cd-history-date {
+        font-size: 0.65rem;
+    }
+
+    .cd-delete-btn {
+        opacity: 0.5;
+        font-size: 0.85rem;
+        padding: 0.15rem;
+    }
+
+    .cd-no-history {
+        font-size: 0.8rem;
+        padding: 1rem;
+    }
+
+    .cd-status-text {
+        font-size: 0.72rem;
+    }
+
+    .cd-feature-label {
+        font-size: 0.68rem;
+    }
+
+    .cd-feature-value {
+        font-size: 0.9rem;
+    }
+
+    .cd-image-label {
+        font-size: 0.6rem;
+        padding: 2px 6px;
     }
 }
