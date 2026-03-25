@@ -30,6 +30,8 @@ function CrackDetection() {
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     const fileInputRef = useRef(null);
+    const streamImgRef = useRef(null);
+    const canvasRef = useRef(null);
 
     // Load history on mount
     useEffect(() => { loadHistory(); }, []);
@@ -47,11 +49,13 @@ function CrackDetection() {
     };
 
     // === ESP32-CAM Connection ===
+    // === Connect directly to ESP32 (no backend proxy needed) ===
     const connectStream = useCallback(() => {
         const ip = camIP.trim();
         if (!ip) { setError('Please enter the ESP32-CAM IP address'); return; }
         setError(null);
-        setStreamURL(`${API_BASE_URL}/api/esp32/stream?ip=${encodeURIComponent(ip)}`);
+        // Direct connection — <img> tags are exempt from CORS
+        setStreamURL(`http://${ip}:81/stream`);
         setIsConnected(true);
         setStreamStatus('live');
     }, [camIP]);
@@ -64,28 +68,47 @@ function CrackDetection() {
 
     const handleStreamError = useCallback(() => {
         setStreamStatus('error');
-        setError('Stream connection failed — check IP and ensure ESP32-CAM is on the same network');
+        setError('Stream connection failed — check IP and ensure you are on the same network as the ESP32-CAM');
     }, []);
 
-    // === Capture via backend proxy ===
+    // === Capture frame from live stream via canvas ===
     const captureFromESP32 = useCallback(async () => {
         if (!isConnected) { setError('Please connect to the camera first'); return; }
         setError(null);
         try {
-            const resp = await fetch(`${API_BASE_URL}/api/esp32/capture?ip=${encodeURIComponent(camIP.trim())}`);
-            if (!resp.ok) {
-                const errData = await resp.json().catch(() => ({}));
-                throw new Error(errData.detail || 'Capture failed');
+            const img = streamImgRef.current;
+            if (!img || !img.naturalWidth) {
+                throw new Error('Stream not ready — wait for the image to load');
             }
+            const canvas = canvasRef.current;
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+            const base64 = dataURL.split(',')[1];
+            setCapturedImage(dataURL);
+
+            // Convert to blob for Supabase upload
+            const resp = await fetch(dataURL);
             const blob = await resp.blob();
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setCapturedImage(reader.result);
-                analyzeImage(reader.result.split(',')[1], blob);
-            };
-            reader.readAsDataURL(blob);
+            analyzeImage(base64, blob);
         } catch (err) {
-            setError(err.message || 'Failed to capture image from ESP32-CAM');
+            // Fallback: try backend proxy for capture if canvas fails (CORS tainted canvas)
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/esp32/capture?ip=${encodeURIComponent(camIP.trim())}`);
+                if (!resp.ok) throw new Error('Capture failed');
+                const blob = await resp.blob();
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setCapturedImage(reader.result);
+                    analyzeImage(reader.result.split(',')[1], blob);
+                };
+                reader.readAsDataURL(blob);
+            } catch (fallbackErr) {
+                setError('Capture failed — make sure you are on the same network as the ESP32-CAM');
+            }
         }
     }, [isConnected, camIP]);
 
@@ -234,6 +257,7 @@ function CrackDetection() {
                         <div className="cd-stream-wrapper">
                             {streamURL ? (
                                 <img id="esp32-stream" className="cd-stream-img" src={streamURL}
+                                    ref={streamImgRef} crossOrigin="anonymous"
                                     alt="ESP32-CAM Live Stream" onError={handleStreamError} />
                             ) : (
                                 <div className="cd-stream-placeholder">
@@ -266,6 +290,7 @@ function CrackDetection() {
                         </button>
                         <input ref={fileInputRef} type="file" accept="image/*"
                             onChange={handleFileUpload} style={{ display: 'none' }} />
+                        <canvas ref={canvasRef} style={{ display: 'none' }} />
                     </div>
                 </div>
 
