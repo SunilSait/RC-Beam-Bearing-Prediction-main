@@ -1,8 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
 from typing import Optional
 import math
+import base64
+import httpx
+from crack_detect import process_crack_image
 
 # ====================================================
 # FASTAPI APP SETUP
@@ -211,6 +215,82 @@ def predict_endpoint(params: BeamParameters):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
+
+# ====================================================
+# CRACK DETECTION MODELS & ENDPOINT
+# ====================================================
+class CrackDetectRequest(BaseModel):
+    image_base64: str = Field(..., description="Base64-encoded JPEG/PNG image")
+
+@app.post("/api/crack-detect")
+def crack_detect_endpoint(request: CrackDetectRequest):
+    """
+    Analyze an image for cracks using morphological processing and feature extraction.
+    
+    Translates the MATLAB crack detection algorithm to Python/OpenCV:
+    - Grayscale → Median filter → Morphological opening (6 angles)
+    - Overlap fusion → Otsu threshold → Crack mask
+    - Shape feature extraction → Rule-based classification
+    
+    Returns crack type, confidence, features, and processed image.
+    """
+    try:
+        image_bytes = base64.b64decode(request.image_base64)
+        result = process_crack_image(image_bytes)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Crack detection failed: {str(e)}")
+
+# ====================================================
+# ESP32-CAM PROXY ENDPOINTS (bypass browser CORS)
+# ====================================================
+@app.get("/api/esp32/stream")
+async def esp32_stream_proxy(ip: str = Query(..., description="ESP32-CAM IP address")):
+    """Proxy the MJPEG stream from ESP32-CAM to bypass CORS."""
+    stream_url = f"http://{ip}:81/stream"
+    try:
+        client = httpx.AsyncClient(timeout=None)
+        req = client.build_request("GET", stream_url)
+        resp = await client.send(req, stream=True)
+        return StreamingResponse(
+            resp.aiter_bytes(),
+            media_type=resp.headers.get("content-type", "multipart/x-mixed-replace"),
+            background=client.aclose,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to ESP32-CAM at {ip}: {str(e)}")
+
+@app.get("/api/esp32/capture")
+async def esp32_capture_proxy(ip: str = Query(..., description="ESP32-CAM IP address")):
+    """Proxy a still capture from ESP32-CAM."""
+    capture_url = f"http://{ip}/capture"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(capture_url)
+            resp.raise_for_status()
+            return Response(
+                content=resp.content,
+                media_type=resp.headers.get("content-type", "image/jpeg"),
+            )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Capture failed from {ip}: {str(e)}")
+
+@app.get("/api/esp32/control")
+async def esp32_control_proxy(
+    ip: str = Query(...),
+    var: str = Query(...),
+    val: str = Query(...),
+):
+    """Proxy control commands to ESP32-CAM (flash, resolution, etc)."""
+    control_url = f"http://{ip}/control?var={var}&val={val}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(control_url)
+            return {"status": "ok", "response": resp.text}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Control command failed: {str(e)}")
 
 @app.get("/health")
 def health_check():
